@@ -1,14 +1,15 @@
-# Expose le site via l'Ingress Controller Nginx sur https://www.ecommerce.lcl
-# (le domaine est déclaré dans /etc/hosts par l'utilisateur).
+# Expose le site via l'Ingress Controller de k3s (Traefik par défaut) sur
+# https://www.ecommerce.lcl (domaine déclaré dans /etc/hosts).
+# Passe tout le HTTP vers HTTPS.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: web
   namespace: ecommerce
   annotations:
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    traefik.ingress.kubernetes.io/router.entrypoints: web,websecure
 spec:
-  ingressClassName: nginx
+  ingressClassName: traefik
   tls:
     - hosts:
         - www.ecommerce.lcl

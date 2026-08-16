@@ -32,9 +32,10 @@ Airflow (DAG airflow/etl_dag.py) ──► ETL : lit sales.csv ──► écrit 
 ```
 
 ## Mise en place (résumé)
-1. **Domaine** : `echo "<IP_NOEUD> www.ecommerce.lcl" >> /etc/hosts`
-2. **Cluster** : installer Nginx Ingress Controller + ArgoCD.
-3. **ArgoCD** : lier le repo GitHub et créer l'Application (path `./k8s`) :
+1. **Cluster k3s** : k3s embarque un Ingress Controller (Traefik par défaut) →
+   `kubectl get ingressclass` pour vérifier. Ici `ingressClassName: traefik`.
+2. **Domaine** : `echo "<IP> www.ecommerce.lcl" >> /etc/hosts`
+3. **ArgoCD** : installer dans `argocd` puis créer l'Application (path `./k8s`) :
    ```bash
    argocd repo add https://github.com/Aritendry/K8sProject.git
    kubectl apply -f - <<'EOF'
