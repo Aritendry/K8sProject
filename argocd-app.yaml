@@ -1,0 +1,20 @@
+# Application ArgoCD — déploie le site depuis le repo GitHub (path ./k8s).
+# Ce fichier est versionné et appliqué par : kubectl apply -f argocd-app.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecommerce
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Aritendry/K8sProject.git
+    targetRevision: main
+    path: ./k8s
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: ecommerce
+  syncPolicy:
+    automated:
+      selfHeal: true
+      prune: true

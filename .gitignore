@@ -3,6 +3,9 @@
 *.key
 *.crt
 
+# Script de lancement personnel (peut contenir des tokens) — à ne pas versionner.
+cmd
+
 # Python / Airflow
 __pycache__/
 *.py[cod]
