@@ -1,0 +1,8 @@
+# Clés privées / certificats (jamais versionnés en prod ; la démo embarque
+# le secret dans tls.yaml, donc on ignore les fichiers sources openssl).
+*.key
+*.crt
+
+# Python / Airflow
+__pycache__/
+*.py[cod]

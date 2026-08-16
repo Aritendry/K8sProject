@@ -1,0 +1,16 @@
+Techno
+K8S
+ArgoCD - Github
+Nginx on a un DOmaine encodé avec /etc/host (Ex: www.ecommerce.lcl)
+Ingres Controller avec Certificat SSL - file.crt
+
+Objectif
+deployement de serveur web
+    site ecommerce (html avec des dahsboard)avec des fake datas (json,csv ,etc)
+
+On a un dossier Projet qu'on envoie dans github
+
+Une fois dans github github se lie avec AgroCD puis ArgoCD se lie avec K8S
+Après cela fait on crée un Job airflow qui lui va créer un processus ETL (combien y a t il de donné vendu durant ce mois(les donnés sont tirés vers le serveur web ),etc)
+
+PS pas de docker

@@ -1,0 +1,26 @@
+# Expose le site via l'Ingress Controller Nginx sur https://www.ecommerce.lcl
+# (le domaine est déclaré dans /etc/hosts par l'utilisateur).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: web
+  namespace: ecommerce
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - www.ecommerce.lcl
+      secretName: ecommerce-tls
+  rules:
+    - host: www.ecommerce.lcl
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 80

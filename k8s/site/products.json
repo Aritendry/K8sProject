@@ -1,0 +1,7 @@
+[
+  {"id":1,"name":"Casque Bluetooth","category":"Electro","price":89.99,"stock":42},
+  {"id":2,"name":"Montre connecte","category":"Electro","price":129.5,"stock":18},
+  {"id":3,"name":"Sac a dos","category":"Mode","price":39.99,"stock":27},
+  {"id":4,"name":"Baskets","category":"Sport","price":119.0,"stock":15},
+  {"id":5,"name":"Cafetiere","category":"Maison","price":199.0,"stock":9}
+]
