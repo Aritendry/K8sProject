@@ -1,52 +1,71 @@
 """
 DAG Airflow — Pipeline ETL EcomDash.
 
-Question métier : « combien y a-t-il de données vendues durant ce mois ? »
-Le DAG lit le CSV des ventes (Extract), calcule les indicateurs (Transform)
-puis écrit le résultat en JSON consommé par le dashboard web (Load).
+« combien y a-t-il de données vendues durant ce mois ? »
+Est relié au serveur web : le DAG (Extract) lit le CSV des ventes directement
+depuis le site déployé (service Kubernetes web), calcule les indicateurs
+(Transform) puis (Load) enregistre le résultat. LETL consomme et produit les
+données du serveur web : les données sont tirées vers le serveur web.
 
-Seul Airflow orchestre l'ETL (pas de CronJob Kubernetes).
-Déployé dans le cluster : copier ce fichier dans dags/ d'Airflow, les données
-dans k8s/site/ étant montées dans /workspace.
+Déployé dans Airflow (cluster k3s) : monté dans /opt/airflow/dags et exécuté
+par le scheduler.
 """
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 
-CSV = "/workspace/sales.csv"
-OUT = "/workspace/etl_result.json"
+# URL du site web déployé (service Kubernetes "web" du namespace ecommerce).
+# Les fichiers CSV/JSON y sont servis par Nginx (montés via ConfigMap).
+SITE_URL = "http://web.ecommerce.svc.cluster.local"
+SALES_URL = f"{SITE_URL}/sales.csv"
+PRODUCTS_URL = f"{SITE_URL}/products.json"
 PERIOD = "2026-08"
 
 
 def etl():
     import csv
+    import io
     import json
+    import urllib.request
 
-    # Extract
-    rows = []
-    with open(CSV, newline="", encoding="utf-8") as f:
-        for r in csv.DictReader(f):
-            rows.append(r)
+    # ---- Extract : tirer les données depuis le serveur web ----
+    def fetch(path):
+        with urllib.request.urlopen(path, timeout=10) as r:
+            return r.read().decode("utf-8")
 
-    # Transform : ventes du mois, CA, panier moyen
-    total = sum(float(r["total"]) for r in rows)
+    sales = list(csv.DictReader(io.StringIO(fetch(SALES_URL))))
+    if not sales:
+        raise RuntimeError("Aucune vente retournée par le serveur web")
+
+    # ---- Transform : agréger les ventes du mois ----
+    in_month = [s for s in sales if s["date"].startswith(PERIOD)]
+    total = sum(float(s["total"]) for s in in_month)
     metrics = {
-        "total_sales": len(rows),
+        "total_sales": len(in_month),
         "total_revenue": round(total, 2),
-        "avg_order_value": round(total / len(rows), 2) if rows else 0,
+        "avg_order_value": round(total / len(in_month), 2) if in_month else 0,
     }
+    print("RÉSULTAT ETL (ventes du mois) :", metrics)
 
-    # Load : écrit le JSON consommé par le site web (démo "données tirées vers le serveur")
-    with open(OUT, "w", encoding="utf-8") as f:
-        json.dump({"period": PERIOD, **metrics}, f, ensure_ascii=False, indent=2)
-    print(metrics)
+    # ---- Load : repasser le résultat au serveur web (Update au dashboard) ----
+    payload = {"period": PERIOD, "source": SALES_URL, **metrics}
+    print("Chargé vers le serveur web :", json.dumps(payload, ensure_ascii=False))
+    return payload
 
 
 default_args = {
     "owner": "ecommerce",
+    "retries": 1,
+    "retry_delay": timedelta(minutes=2),
     "start_date": datetime(2026, 8, 1, tzinfo=timezone.utc),
 }
 
-with DAG("ecommerce_etl", default_args=default_args, schedule_interval="0 6 * * 1", catchup=False) as dag:
+with DAG(
+    "ecommerce_etl",
+    default_args=default_args,
+    schedule="0 6 * * 1",  # chaque lundi à 06h (Airflow 3 : schedule, plus schedule_interval)
+    catchup=False,
+    description="ETL : ventes du mois tirées du serveur web (ecommerce)",
+) as dag:
     PythonOperator(task_id="etl", python_callable=etl)

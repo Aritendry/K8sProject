@@ -1,0 +1,63 @@
+# ConfigMap des DAGs Airflow branchés sur le projet EcomDash.
+# Le DAG est monté dans /opt/airflow/dags des workloads Airflow
+# (scheduler + dag-processor) pour être automatiquement découvert.
+#
+# Notre DAG ecommerce_etl lit les données depuis le serveur web déployé
+# (service web du namespace ecommerce) — les données sont tirées vers le
+# serveur web, conformément à l'énoncé.
+#
+# Appliquer : kubectl apply -f k8s/airflow-dags.yaml -n airflow
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-airflow-dags
+  namespace: airflow
+data:
+  ecommerce_etl_dag.py: |
+    from datetime import datetime, timezone, timedelta
+    from airflow import DAG
+    from airflow.operators.python import PythonOperator
+
+    SITE_URL = "http://web.ecommerce.svc.cluster.local"
+    SALES_URL = f"{SITE_URL}/sales.csv"
+    PERIOD = "2026-08"
+
+    def etl():
+        import csv
+        import io
+        import json
+        import urllib.request
+
+        def fetch(path):
+            with urllib.request.urlopen(path, timeout=10) as r:
+                return r.read().decode("utf-8")
+
+        sales = list(csv.DictReader(io.StringIO(fetch(SALES_URL))))
+        if not sales:
+            raise RuntimeError("Aucune vente retournée par le serveur web")
+
+        in_month = [s for s in sales if s["date"].startswith(PERIOD)]
+        total = sum(float(s["total"]) for s in in_month)
+        metrics = {
+            "total_sales": len(in_month),
+            "total_revenue": round(total, 2),
+            "avg_order_value": round(total / len(in_month), 2) if in_month else 0,
+        }
+        print("RÉSULTAT ETL (ventes du mois) :", metrics)
+        return {"period": PERIOD, "source": SALES_URL, **metrics}
+
+    default_args = {
+        "owner": "ecommerce",
+        "retries": 1,
+        "retry_delay": timedelta(minutes=2),
+        "start_date": datetime(2026, 8, 1, tzinfo=timezone.utc),
+    }
+
+    with DAG(
+        "ecommerce_etl",
+        default_args=default_args,
+        schedule="0 6 * * 1",
+        catchup=False,
+        description="ETL : ventes du mois tirées du serveur web (ecommerce)",
+    ) as dag:
+        PythonOperator(task_id="etl", python_callable=etl)
