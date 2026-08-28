@@ -1,0 +1,112 @@
+# ConfigMap du site e-commerce, monté dans /usr/share/nginx/html du Pod Nginx.
+# NB : déclaré manuellement (pas via configMapGenerator) pour que son nom soit
+# exactement "ecommerce-site", référencé par le Deployment — les versions de
+# kustomize embarquées ne réécrivent pas toujours les références des générateurs.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ecommerce-site
+  namespace: ecommerce
+data:
+  index.html: |
+    <!DOCTYPE html>
+    <html lang="fr">
+    <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>EcomDash</title>
+    <style>
+      *{box-sizing:border-box;margin:0;font-family:system-ui,Segoe UI,sans-serif}
+      body{background:#f4f6f9;color:#1f2933}
+      header{background:#1f6feb;color:#fff;padding:16px 24px;display:flex;justify-content:space-between;align-items:center}
+      header button{background:rgba(255,255,255,.2);border:0;color:#fff;padding:8px 14px;border-radius:6px;cursor:pointer;margin-left:6px}
+      main{padding:24px;max-width:1100px;margin:auto}
+      .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+      .card{background:#fff;border-radius:10px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+      .card h3{font-size:15px;margin:6px 0}
+      .price{color:#1158c7;font-weight:700;font-size:18px}
+      .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:16px;margin-bottom:20px}
+      .stat{background:#fff;border-left:5px solid #1f6feb;border-radius:8px;padding:16px;box-shadow:0 2px 8px rgba(0,0,0,.08)}
+      .stat .v{font-size:24px;font-weight:700}
+      .stat .l{font-size:12px;color:#6b7280;text-transform:uppercase}
+      table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden}
+      th,td{padding:10px;text-align:left;border-bottom:1px solid #eee;font-size:14px}
+      th{background:#f9fafb;color:#6b7280}
+      .tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;background:#dcfce7;color:#15803d}
+    </style>
+    </head>
+    <body>
+    <header>
+      <b>🛒 EcomDash</b>
+      <div>
+        <button onclick="view('shop')">Boutique</button>
+        <button onclick="view('dash')">Dashboard + ETL</button>
+      </div>
+    </header>
+
+    <main id="shop">
+      <h2 style="margin-bottom:16px">Nos produits</h2>
+      <div class="cards" id="grid"></div>
+    </main>
+
+    <main id="dash" style="display:none">
+      <h2 style="margin-bottom:16px">Dashboard — Ventes du mois (août 2026)</h2>
+      <div class="stats" id="stats"></div>
+      <table id="tbl">
+        <thead><tr><th>Date</th><th>Produit</th><th>Qté</th><th>Total</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <p id="etl" style="margin-top:16px;color:#6b7280;font-size:13px"></p>
+    </main>
+
+    <script>
+      let PRODUCTS=[];
+      fetch('products.json').then(r=>r.json()).then(p=>{
+        PRODUCTS=p;
+        document.getElementById('grid').innerHTML=p.map(x=>
+          `<div class="card"><h3>${x.name}</h3><div class="tag">${x.category}</div>
+           <p class="price">${x.price}€</p><p style="font-size:12px">stock: ${x.stock}</p></div>`).join('');
+      });
+
+      function view(v){
+        document.getElementById('shop').style.display = v==='shop'?'block':'none';
+        document.getElementById('dash').style.display = v==='dash'?'block':'none';
+      }
+
+      fetch('sales.csv').then(r=>r.text()).then(txt=>{
+        const rows=txt.trim().split('\n').slice(1).map(l=>l.split(','));
+        let total=0,count=rows.length;
+        const body=document.getElementById('tbl').querySelector('tbody');
+        rows.forEach(r=>{
+          total+=parseFloat(r[4]);
+          body.innerHTML+=`<tr><td>${r[1]}</td><td>${pname(r[2])}</td><td>${r[3]}</td><td>${parseFloat(r[4]).toFixed(2)}€</td></tr>`;
+        });
+        document.getElementById('stats').innerHTML=`
+          <div class="stat"><div class="v">${count}</div><div class="l">Ventes du mois</div></div>
+          <div class="stat"><div class="v">${total.toFixed(2)}€</div><div class="l">CA du mois</div></div>
+          <div class="stat"><div class="v">${(total/count).toFixed(2)}€</div><div class="l">Panier moyen</div></div>`;
+        document.getElementById('etl').textContent=
+          'Réponse ETL (Airflow) : ' + count + ' ventes vendues ce mois — données tirées vers le serveur web.';
+      });
+      function pname(id){const p=PRODUCTS.find(x=>x.id==id);return p?p.name:'#'+id;}
+    </script>
+    </body>
+    </html>
+  products.json: |
+    [
+      {"id":1,"name":"Casque Bluetooth","category":"Electro","price":89.99,"stock":42},
+      {"id":2,"name":"Montre connecte","category":"Electro","price":129.5,"stock":18},
+      {"id":3,"name":"Sac a dos","category":"Mode","price":39.99,"stock":27},
+      {"id":4,"name":"Baskets","category":"Sport","price":119.0,"stock":15},
+      {"id":5,"name":"Cafetiere","category":"Maison","price":199.0,"stock":9}
+    ]
+  sales.csv: |
+    sale_id,date,product_id,qty,total
+    1,2026-08-01,1,1,89.99
+    2,2026-08-01,3,2,79.98
+    3,2026-08-03,2,1,129.50
+    4,2026-08-05,5,1,199.00
+    5,2026-08-07,4,1,119.00
+    6,2026-08-10,1,3,269.97
+    7,2026-08-12,2,1,129.50
+    8,2026-08-15,5,1,199.00

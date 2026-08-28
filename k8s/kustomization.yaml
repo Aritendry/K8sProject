@@ -1,19 +1,14 @@
 # Point d'entrée ArgoCD : path = ./k8s
-# Génère le ConfigMap "ecommerce-site" depuis k8s/site/ (les fichiers y sont
-# référencés par chemin relatif) et déploie tous les manifestes.
+# Le ConfigMap du site est déclaré manuellement (configmap.yaml) pour que son
+# nom soit exactement "ecommerce-site" (référence du Deployment) — les versions
+# de kustomize ne réécrivent pas toujours les références des générateurs.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
   - namespace.yaml
+  - configmap.yaml
   - deployment.yaml
   - service.yaml
   - ingress.yaml
   - tls.yaml
-
-configMapGenerator:
-  - name: ecommerce-site
-    files:
-      - site/index.html
-      - site/products.json
-      - site/sales.csv
